@@ -41,34 +41,39 @@ def poisson_blending(source, target, mask, position):
     b = np.zeros((len(unknown_index), 3))
     for (i, j), p in zip(var_num.keys(), var_num.values()):
         A[p, p] = 4
+        f_star = np.zero(3)
 
         # Look for neighboors inside the mask or compute the gradient for b
         if (i, j + 1) in var_num:
             A[p, var_num[(i, j + 1)]] = -1
         else:
-            pass # TODO: Gradient
+            f_star += target[i, j + 1]
 
         if (i, j - 1) in var_num:
             A[p, var_num[(i, j - 1)]] = -1
         else:
-            pass # TODO: Gradient
+            f_star += target[i, j - 1]
 
         if (i + 1, j) in var_num:
             A[p, var_num[(i + 1, j)]] = -1
         else:
-            pass # TODO: Gradient
+            f_star += target[i + 1, j]
 
         if (i - 1, j) in var_num:
             A[p, var_num[(i - 1, j)]] = -1
         else:
-            pass # TODO: Gradient
-        
-        # Solve the lineal system using cholesky decomposition for each channel
-        cholesky_factorization = cho_factor(A)
-        x = np.zeros_like(b)
-        for c in range(3):
-            x[:, c] = cho_solve(cholesky_factorization, b[:, c])
+            f_star += target[i - 1, j]
 
-        blend = target.copy()
-        blend[unknown_index[:, 0], unknown_index[:, 1]] = x
-        return blend
+        # f_star + sum(v_pq) gradient; v_pq = g_p - g_q
+        b[p] = f_star + 4 * source[i, j] - source[i, j + 1] \
+               - source[i, j - 1] - source[i + 1, j] - source[i - 1, j]
+
+    # Solve the lineal system using cholesky decomposition for each channel
+    cholesky_factorization = cho_factor(A)
+    x = np.zeros_like(b)
+    for c in range(3):
+        x[:, c] = cho_solve(cholesky_factorization, b[:, c])
+
+    blend = target.copy()
+    blend[unknown_index[:, 0], unknown_index[:, 1]] = x
+    return blend
