@@ -1,5 +1,4 @@
 from scipy.linalg import cho_factor, cho_solve
-from scipy import sparse
 import numpy as np
 
 
@@ -44,7 +43,7 @@ def poisson_blending(source, target, mask, position):
 
     # Fill the sparse matrix like in the (7) equation of the paper
     # var_num dict has ordered variables from 0 to len(unknown_index)
-    A = sparse.identity(len(unknown_index), format='lil')
+    A = np.identity(len(unknown_index))
     b = np.zeros((len(unknown_index), 3))
     for (i, j), p in zip(var_num.keys(), var_num.values()):
         A[p, p] = 4
@@ -76,7 +75,7 @@ def poisson_blending(source, target, mask, position):
                - source[i, j - 1] - source[i + 1, j] - source[i - 1, j]
 
     # Solve the lineal system using cholesky decomposition for each channel
-    cholesky_factorization = cho_factor(A.toarray())
+    cholesky_factorization = cho_factor(A)
     x = np.zeros_like(b)
     for c in range(3):
         x[:, c] = cho_solve(cholesky_factorization, b[:, c])
