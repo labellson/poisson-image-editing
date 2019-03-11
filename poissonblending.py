@@ -1,4 +1,5 @@
-from scipy.linalg import cho_factor, cho_solve
+from scipy.sparse.linalg import spsolve
+from scipy import sparse
 import numpy as np
 
 
@@ -34,6 +35,10 @@ def poisson_blending(source, target, mask, position):
     blend_roi = blend[position[0]:position[0] + hm,
                       position[1]:position[1] + wm]
 
+    # If mask has 3 channels assume all channels has same values
+    if len(mask.shape) > 2:
+        mask = mask[..., 1]
+
     # Every pixel involved will have an unknown variable, so the first pixel of
     # the mask will be variable 0, second 1, ... use only the non zero entries
     # of the mask
@@ -43,7 +48,7 @@ def poisson_blending(source, target, mask, position):
 
     # Fill the sparse matrix like in the (7) equation of the paper
     # var_num dict has ordered variables from 0 to len(unknown_index)
-    A = np.identity(len(unknown_index))
+    A = sparse.identity(len(unknown_index), format='lil')
     b = np.zeros((len(unknown_index), 3))
     for (i, j), p in zip(var_num.keys(), var_num.values()):
         A[p, p] = 4
@@ -74,11 +79,11 @@ def poisson_blending(source, target, mask, position):
         b[p] = f_star + 4 * source[i, j] - source[i, j + 1] \
                - source[i, j - 1] - source[i + 1, j] - source[i - 1, j]
 
-    # Solve the lineal system using cholesky decomposition for each channel
-    cholesky_factorization = cho_factor(A)
+    # Solve the lineal system for each channel using scipy spsolve
+    A = A.tocsr()
     x = np.zeros_like(b)
     for c in range(3):
-        x[:, c] = cho_solve(cholesky_factorization, b[:, c])
+        x[:, c] = spsolve(A, b[:, c])
         x[x < 0] = 0
         x[x > 1] = 1
 
@@ -88,11 +93,11 @@ def poisson_blending(source, target, mask, position):
 
 if __name__ == '__main__':
     import cv2
-    source = cv2.imread('./poisson_data/balloon.png')
-    mask = cv2.imread('./poisson_data/balloonmask.png', cv2.IMREAD_GRAYSCALE)
-    target = cv2.imread('./poisson_data/moon.png')
+    source = cv2.imread('./poisson_data/fg.jpg')
+    mask = cv2.imread('./poisson_data/mask.jpg', cv2.IMREAD_GRAYSCALE)
+    target = cv2.imread('./poisson_data/bg.jpg')
     #pos = (108, 462)
-    pos = (200, 300)
+    pos = (100, 100)
 
     hm, wm = mask.shape
 
